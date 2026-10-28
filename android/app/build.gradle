@@ -72,6 +72,23 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+/**
+ * Secrets are read from the gitignored ../../.env file (KEY=value per line),
+ * falling back to environment variables so CI can inject them instead.
+ */
+def dotEnv = [:]
+def dotEnvFile = rootProject.file("../.env")
+if (dotEnvFile.exists()) {
+    dotEnvFile.eachLine { line ->
+        def trimmed = line.trim()
+        if (trimmed && !trimmed.startsWith("#") && !trimmed.startsWith("//") && trimmed.contains("=")) {
+            def (k, v) = trimmed.split("=", 2)
+            dotEnv[k.trim()] = v.trim()
+        }
+    }
+}
+def secret = { String name -> dotEnv[name] ?: System.getenv(name) ?: "" }
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -84,6 +101,7 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        manifestPlaceholders = [GOOGLE_MAPS_API_KEY: secret("GOOGLE_MAPS_API_KEY")]
     }
     signingConfigs {
         debug {
