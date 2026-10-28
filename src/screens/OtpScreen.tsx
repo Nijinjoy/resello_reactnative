@@ -80,6 +80,7 @@ function OtpScreen({ navigation, route }: RootStackScreenProps<'Otp'>) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+    
       <StatusBar barStyle="dark-content" />
       <Pressable
         style={[
