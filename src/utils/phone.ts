@@ -1,4 +1,3 @@
-// UAE mobile numbers: 9 digits starting with 5 (e.g. 50 123 4567).
 export const PHONE = {
   flag: '🇦🇪',
   dialCode: '+971',
@@ -8,7 +7,6 @@ export const PHONE = {
 
 const DIAL_DIGITS = PHONE.dialCode.slice(1);
 
-// Strips formatting and a pasted "+971" / leading "0", keeping the local digits.
 export function normalizePhone(text: string): string {
   let digits = text.replace(/\D/g, '');
   if (digits.length > PHONE.length && digits.startsWith(DIAL_DIGITS)) {

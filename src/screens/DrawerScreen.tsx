@@ -3,8 +3,10 @@ import {
   Alert,
   Animated,
   Easing,
+  Image,
   Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -29,7 +31,14 @@ import {
   X,
 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { deleteAccount } from '../services/auth';
+import { deleteAccount } from '../services/authService';
+import {
+  clearSession,
+  getSavedUser,
+  saveUser,
+  User,
+} from '../services/session';
+import { getProfile } from '../services/userService';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
 
@@ -71,62 +80,69 @@ const OPEN_DURATION = 450;
 const CLOSE_DURATION = 380;
 const EASING = Easing.inOut(Easing.cubic);
 
+const ACCOUNT_ROWS = 2;
+const ROW_COUNT =
+  SECTIONS.reduce((sum, section) => sum + section.items.length, 0) +
+  ACCOUNT_ROWS;
+const SECTION_COUNT = SECTIONS.length + 1;
+
+const MIN_ROW_HEIGHT = 32;
+const MAX_ROW_HEIGHT = 52;
+const ICON_TILE_SIZE = 32;
+
+const SECTION_GAP = 12;
+const SECTION_TITLE_HEIGHT = 19;
+const PROFILE_HEIGHT = 70;
+const VERSION_HEIGHT = 22;
+const PADDING_Y = 28;
+
+// Shares the height left by the fixed parts of the drawer between the rows.
+// When even the minimum doesn't fit, the menu scrolls.
+export function drawerRowHeight(screenHeight: number, insetsY: number) {
+  const fixed =
+    insetsY +
+    PADDING_Y +
+    PROFILE_HEIGHT +
+    VERSION_HEIGHT +
+    SECTION_COUNT * SECTION_TITLE_HEIGHT +
+    (SECTION_COUNT - 1) * SECTION_GAP;
+  const rowHeight = Math.floor((screenHeight - fixed) / ROW_COUNT);
+  return Math.min(MAX_ROW_HEIGHT, Math.max(MIN_ROW_HEIGHT, rowHeight));
+}
+
 type DrawerItemProps = MenuItem & {
+  height: number;
   onPress: () => void;
   danger?: boolean;
 };
 
-function DrawerItem({ label, Icon, tint, onPress, danger }: DrawerItemProps) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  const springTo = (toValue: number) =>
-    Animated.spring(scale, {
-      toValue,
-      friction: 6,
-      tension: 220,
-      useNativeDriver: true,
-    }).start();
+function DrawerItem({
+  label,
+  Icon,
+  tint,
+  height,
+  onPress,
+  danger,
+}: DrawerItemProps) {
+  const tileSize = Math.min(ICON_TILE_SIZE, height - 6);
 
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={() => springTo(0.96)}
-      onPressOut={() => springTo(1)}
       accessibilityRole="button"
       accessibilityLabel={label}
+      style={[styles.row, { height }]}
     >
-      {({ pressed }) => (
-        <Animated.View
-          style={[
-            styles.row,
-            pressed && styles.rowPressed,
-            { transform: [{ scale }] },
-          ]}
-        >
-          <View
-            style={[
-              styles.iconTile,
-              { backgroundColor: pressed ? tint : `${tint}1A` },
-            ]}
-          >
-            <Icon
-              color={pressed ? colors.onPrimary : tint}
-              size={18}
-              strokeWidth={2.2}
-            />
-          </View>
-          <Text style={[styles.rowLabel, danger && { color: tint }]}>
-            {label}
-          </Text>
-          {!danger && (
-            <ChevronRight
-              color={pressed ? tint : colors.body}
-              size={18}
-              style={pressed && styles.chevronPressed}
-            />
-          )}
-        </Animated.View>
-      )}
+      <View
+        style={[
+          styles.iconTile,
+          { width: tileSize, height: tileSize, backgroundColor: `${tint}1A` },
+        ]}
+      >
+        <Icon color={tint} size={18} strokeWidth={2.2} />
+      </View>
+      <Text style={[styles.rowLabel, danger && { color: tint }]}>{label}</Text>
+      {!danger && <ChevronRight color={colors.body} size={18} />}
     </Pressable>
   );
 }
@@ -134,11 +150,35 @@ function DrawerItem({ label, Icon, tint, onPress, danger }: DrawerItemProps) {
 function DrawerScreen({ visible, onClose }: Props) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const drawerWidth = Math.min(width * 0.82, 340);
+  const rowHeight = drawerRowHeight(height, insets.top + insets.bottom);
   const progress = useRef(new Animated.Value(0)).current;
   const [mounted, setMounted] = useState(visible);
   const shown = useRef(false);
+  const [profile, setProfile] = useState<User | null>(null);
+
+  // Show the saved user straight away, then refresh it on each open.
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    let active = true;
+    getSavedUser()
+      .then(user => active && user && setProfile(current => current ?? user))
+      .catch(() => undefined);
+    getProfile()
+      .then(user => {
+        if (active) {
+          setProfile(user);
+          return saveUser(user);
+        }
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [visible]);
 
   const animateTo = (toValue: number, onDone?: () => void) => {
     progress.stopAnimation();
@@ -150,8 +190,6 @@ function DrawerScreen({ visible, onClose }: Props) {
     }).start(({ finished }) => finished && onDone?.());
   };
 
-  // Opening waits for the Modal's onShow so the slide-in starts once the
-  // drawer is actually on screen instead of dropping its first frames.
   const handleShow = () => {
     shown.current = true;
     animateTo(1);
@@ -173,6 +211,7 @@ function DrawerScreen({ visible, onClose }: Props) {
   }, [visible]);
 
   const logOut = () => {
+    clearSession().catch(() => undefined);
     onClose();
     navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
   };
@@ -240,10 +279,21 @@ function DrawerScreen({ visible, onClose }: Props) {
         <View style={styles.profile}>
           <View style={styles.avatar}>
             <UserRound color={colors.primary} size={26} />
+            {profile?.profilePicture && (
+              <Image
+                source={{ uri: profile.profilePicture }}
+                style={styles.avatarImage}
+                accessibilityIgnoresInvertColors
+              />
+            )}
           </View>
           <View style={styles.profileText}>
-            <Text style={styles.name}>Your profile</Text>
-            <Text style={styles.subtitle}>Manage your account</Text>
+            <Text style={styles.name} numberOfLines={1}>
+              {profile?.fullName ?? 'Your profile'}
+            </Text>
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {profile?.email ?? profile?.phoneNumber ?? 'Manage your account'}
+            </Text>
           </View>
           <Pressable
             onPress={onClose}
@@ -256,21 +306,31 @@ function DrawerScreen({ visible, onClose }: Props) {
           </Pressable>
         </View>
 
-        <View style={styles.menu}>
+        <ScrollView
+          style={styles.menu}
+          contentContainerStyle={styles.menuContent}
+          showsVerticalScrollIndicator={false}
+        >
           {SECTIONS.map(section => (
-            <View key={section.title} style={styles.section}>
+            <View key={section.title}>
               <Text style={styles.sectionTitle}>{section.title}</Text>
               {section.items.map(item => (
-                <DrawerItem key={item.label} {...item} onPress={onClose} />
+                <DrawerItem
+                  key={item.label}
+                  {...item}
+                  height={rowHeight}
+                  onPress={onClose}
+                />
               ))}
             </View>
           ))}
-          <View style={styles.section}>
+          <View>
             <Text style={styles.sectionTitle}>Account</Text>
             <DrawerItem
               label="Log out"
               Icon={LogOut}
               tint={colors.error}
+              height={rowHeight}
               onPress={logOut}
               danger
             />
@@ -278,11 +338,12 @@ function DrawerScreen({ visible, onClose }: Props) {
               label="Delete account"
               Icon={Trash2}
               tint={colors.error}
+              height={rowHeight}
               onPress={confirmDelete}
               danger
             />
           </View>
-        </View>
+        </ScrollView>
 
         <Text style={styles.version}>Version {APP_VERSION}</Text>
       </Animated.View>
@@ -339,6 +400,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 2,
     borderColor: colors.accent,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    ...StyleSheet.absoluteFill,
   },
   name: {
     fontFamily: fonts.bold,
@@ -353,10 +418,9 @@ const styles = StyleSheet.create({
   },
   menu: {
     flex: 1,
-    gap: 12,
   },
-  section: {
-    gap: 0,
+  menuContent: {
+    gap: SECTION_GAP,
   },
   sectionTitle: {
     marginLeft: 10,
@@ -378,22 +442,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    height: 44,
     paddingHorizontal: 8,
     borderRadius: 14,
   },
-  rowPressed: {
-    backgroundColor: colors.surface,
-  },
   iconTile: {
-    width: 32,
-    height: 32,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  chevronPressed: {
-    transform: [{ translateX: 3 }],
   },
   rowLabel: {
     flex: 1,

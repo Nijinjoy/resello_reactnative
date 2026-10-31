@@ -25,7 +25,7 @@ import ActionSheet, { ActionSheetOption } from '../components/ActionSheet';
 import Button from '../components/Button';
 import Input from '../components/Input';
 import type { RootStackScreenProps } from '../navigation/types';
-import { saveProfile } from '../services/auth';
+import { saveProfile } from '../services/authService';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
 

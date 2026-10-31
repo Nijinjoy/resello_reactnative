@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useEffectEvent, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -13,7 +13,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import OtpInput from '../components/OtpInput';
 import type { RootStackScreenProps } from '../navigation/types';
-import { requestOtp, verifyOtp } from '../services/auth';
+import { requestOtp, verifyOtp } from '../services/authService';
+import { stopSmsListener, waitForOtp } from '../services/smsOtp';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { formatPhone, PHONE, toE164 } from '../utils/phone';
@@ -28,6 +29,7 @@ function OtpScreen({ navigation, route }: RootStackScreenProps<'Otp'>) {
   const [error, setError] = useState<string>();
   const [verifying, setVerifying] = useState(false);
   const [resendIn, setResendIn] = useState(RESEND_SECONDS);
+  const [smsRequest, setSmsRequest] = useState(0);
 
   useEffect(() => {
     if (resendIn === 0) {
@@ -63,12 +65,34 @@ function OtpScreen({ navigation, route }: RootStackScreenProps<'Otp'>) {
     }
   };
 
+  const fillFromSms = useEffectEvent((otp: string) => {
+    if (!verifying) {
+      handleChange(otp);
+    }
+  });
+
+  useEffect(() => {
+    let active = true;
+    waitForOtp(CODE_LENGTH).then(otp => {
+      if (active && otp) {
+        fillFromSms(otp);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [smsRequest]);
+
+  useEffect(() => stopSmsListener, []);
+
   const handleResend = async () => {
     setCode('');
     setError(undefined);
     setResendIn(RESEND_SECONDS);
     try {
-      await requestOtp(toE164(phone));
+      const request = requestOtp(toE164(phone));
+      setSmsRequest(n => n + 1);
+      await request;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not resend the code');
       setResendIn(0);
@@ -80,7 +104,6 @@ function OtpScreen({ navigation, route }: RootStackScreenProps<'Otp'>) {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-    
       <StatusBar barStyle="dark-content" />
       <Pressable
         style={[

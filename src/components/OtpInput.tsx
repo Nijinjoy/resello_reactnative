@@ -21,8 +21,6 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-// One hidden TextInput drives the boxes, so typing, backspace, paste and
-// SMS autofill all work without juggling focus between six inputs.
 function OtpInput({
   value,
   onChangeValue,

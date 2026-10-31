@@ -16,7 +16,6 @@ type Props = {
   loading?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
-  // Rendered instead of the title text; the title is still used as the accessibility label.
   children?: ReactNode;
 };
 

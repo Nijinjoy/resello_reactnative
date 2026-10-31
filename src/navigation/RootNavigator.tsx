@@ -6,6 +6,7 @@ import {
   TransitionPresets,
 } from '@react-navigation/stack';
 import { Easing } from 'react-native';
+import ChatScreen from '../screens/ChatScreen';
 import SplashScreen from '../screens/SplashScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
@@ -16,8 +17,6 @@ import type { RootStackParamList } from './types';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-// OTP -> profile setup: the new screen fades in while sliding a short
-// distance, so the hand-off between auth steps feels calm rather than abrupt.
 type TransitionSpec = NonNullable<
   StackNavigationOptions['transitionSpec']
 >['open'];
@@ -78,6 +77,11 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen name="Main" component={MainTabs} />
+        <Stack.Screen
+          name="Chat"
+          component={ChatScreen}
+          options={{ gestureEnabled: true }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

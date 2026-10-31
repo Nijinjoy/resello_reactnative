@@ -8,7 +8,6 @@ type Props = Omit<
   React.ComponentProps<typeof Input>,
   'value' | 'onChangeText' | 'prefix'
 > & {
-  // Local digits only, e.g. "501234567".
   value: string;
   onChangeValue: (digits: string) => void;
 };

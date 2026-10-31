@@ -10,6 +10,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import LogoMark from '../components/LogoMark';
 import type { RootStackScreenProps } from '../navigation/types';
+import { restoreSession } from '../services/authService';
 import { fonts } from '../theme/typography';
 
 const LOGO_TEXT = require('../assets/images/logo/logo-text-white.png');
@@ -80,10 +81,12 @@ function SplashScreen({ navigation }: RootStackScreenProps<'Splash'>) {
       Animated.delay(1200),
     ]);
 
+    const session = restoreSession();
+
     pulse.start();
-    intro.start(({ finished }) => {
+    intro.start(async ({ finished }) => {
       if (finished) {
-        navigation.replace('Welcome');
+        navigation.replace(await session);
       }
     });
 

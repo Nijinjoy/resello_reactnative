@@ -13,9 +13,7 @@ import { fonts } from '../theme/typography';
 
 type Props = Omit<TextInputProps, 'style'> & {
   label?: string;
-  // Shown as the field's message and turns the border red.
   error?: string;
-  // Fixed content on the left, separated by a divider (e.g. a dial code).
   prefix?: ReactNode;
   style?: StyleProp<ViewStyle>;
   ref?: Ref<ComponentRef<typeof TextInput>>;

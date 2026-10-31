@@ -34,9 +34,6 @@ const OPEN_DURATION = 300;
 const CLOSE_DURATION = 240;
 const EASING = Easing.bezier(0.25, 0.1, 0.25, 1);
 
-// Bottom sheet replacement for the native Alert/ActionSheet. A chosen option
-// runs only after the sheet has fully closed, so it can safely present native
-// UI of its own (camera, image picker, another modal).
 function ActionSheet({
   visible,
   onClose,
@@ -78,7 +75,6 @@ function ActionSheet({
       animateTo(0, () => {
         shown.current = false;
         setMounted(false);
-        // iOS waits for the Modal's onDismiss before presenting anything else.
         if (Platform.OS !== 'ios') {
           runPending();
         }

@@ -36,11 +36,11 @@
 		<true/>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>Resello uses the camera to take your profile photo.</string>
+	<string>Resello uses the camera to take your profile and listing photos.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Resello needs access to your photos to set your profile picture.</string>
+	<string>Resello needs access to your photos to set your profile picture and add listing photos.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIAppFonts</key>

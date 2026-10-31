@@ -11,10 +11,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '../components/Button';
+import GoogleButton from '../components/GoogleButton';
 import LogoMark from '../components/LogoMark';
 import PhoneInput from '../components/PhoneInput';
 import type { RootStackScreenProps } from '../navigation/types';
-import { requestOtp } from '../services/auth';
+import { requestOtp, signInWithGoogle } from '../services/authService';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
 import { isValidPhone, PHONE, toE164 } from '../utils/phone';
@@ -24,6 +25,8 @@ function LoginScreen({ navigation }: RootStackScreenProps<'Login'>) {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(false);
+  const [googleError, setGoogleError] = useState<string>();
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   const handleChange = (digits: string) => {
     setPhone(digits);
@@ -44,6 +47,22 @@ function LoginScreen({ navigation }: RootStackScreenProps<'Login'>) {
       setError(e instanceof Error ? e.message : 'Something went wrong');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    Keyboard.dismiss();
+    setGoogleError(undefined);
+    setGoogleLoading(true);
+    try {
+      const { isNewUser } = await signInWithGoogle();
+      navigation.reset({
+        index: 0,
+        routes: [{ name: isNewUser ? 'ProfileSetup' : 'Main' }],
+      });
+    } catch (e) {
+      setGoogleError(e instanceof Error ? e.message : 'Something went wrong');
+      setGoogleLoading(false);
     }
   };
 
@@ -75,7 +94,7 @@ function LoginScreen({ navigation }: RootStackScreenProps<'Login'>) {
           onChangeValue={handleChange}
           onSubmitEditing={handleContinue}
           error={error}
-          editable={!loading}
+          editable={!loading && !googleLoading}
           returnKeyType="done"
           style={styles.field}
         />
@@ -84,8 +103,23 @@ function LoginScreen({ navigation }: RootStackScreenProps<'Login'>) {
           title="Continue"
           onPress={handleContinue}
           loading={loading}
+          disabled={googleLoading}
           style={styles.button}
         />
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <GoogleButton
+          onPress={handleGoogle}
+          loading={googleLoading}
+          disabled={loading}
+        />
+        {googleError && <Text style={styles.googleError}>{googleError}</Text>}
+
         <Text style={styles.terms}>
           By continuing, you agree to our Terms and Privacy Policy.
         </Text>
@@ -129,6 +163,29 @@ const styles = StyleSheet.create({
   },
   button: {
     marginTop: 24,
+  },
+  divider: {
+    marginVertical: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.body,
+  },
+  dividerText: {
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.body,
+  },
+  googleError: {
+    marginTop: 8,
+    fontFamily: fonts.regular,
+    fontSize: 13,
+    color: colors.error,
+    textAlign: 'center',
   },
   terms: {
     marginTop: 18,

@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
-  Image,
   ImageSourcePropType,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -14,23 +15,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Button from '../components/Button';
 import type { RootStackScreenProps } from '../navigation/types';
+import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
-
-const COLORS = {
-  background: '#FAF6F0',
-  primary: '#0F766E',
-  accent: '#E0A458',
-  title: '#1F2A2A',
-  body: '#5B6B6A',
-  dotInactive: '#D9CFC1',
-  surface: '#FFFFFF',
-};
-
-type Language = 'en' | 'ar';
 
 type Slide = {
   key: string;
   image: ImageSourcePropType;
+  tint: string;
   title: string;
   description: string;
 };
@@ -39,6 +30,7 @@ const SLIDES: Slide[] = [
   {
     key: 'sell',
     image: require('../assets/images/onboarding/sell/welcome-sell.png'),
+    tint: colors.background,
     title: "Sell what you don't need",
     description:
       'Snap a photo, set your price and reach buyers across the UAE in minutes.',
@@ -46,6 +38,7 @@ const SLIDES: Slide[] = [
   {
     key: 'buy',
     image: require('../assets/images/onboarding/buy/welcome-buy.png'),
+    tint: '#E6F2EE',
     title: 'Buy pre-loved for less',
     description:
       'Discover quality second-hand finds near you and give great items a second life.',
@@ -53,81 +46,41 @@ const SLIDES: Slide[] = [
   {
     key: 'safe',
     image: require('../assets/images/onboarding/safe/welcome-safe.png'),
+    tint: '#FBEEDB',
     title: 'Deal safely, locally',
     description: 'Chat in the app, meet nearby and trade with confidence.',
   },
 ];
 
-const LANGUAGES: Record<Language, { flag: string; name: string }> = {
-  en: { flag: '🇬🇧', name: 'English' },
-  ar: { flag: '🇦🇪', name: 'العربية' },
-};
-
-const TRACK_WIDTH = 58;
-const KNOB_SIZE = 28;
-const TRACK_PADDING = 3;
-const KNOB_TRAVEL = TRACK_WIDTH - KNOB_SIZE - TRACK_PADDING * 2;
-
-type LanguageToggleProps = {
-  value: Language;
-  onChange: (language: Language) => void;
-};
-
-function LanguageToggle({ value, onChange }: LanguageToggleProps) {
-  const isArabic = value === 'ar';
-  const knobX = useRef(new Animated.Value(isArabic ? KNOB_TRAVEL : 0)).current;
-  const current = LANGUAGES[value];
-  const other = LANGUAGES[isArabic ? 'en' : 'ar'];
-
-  useEffect(() => {
-    Animated.spring(knobX, {
-      toValue: isArabic ? KNOB_TRAVEL : 0,
-      friction: 7,
-      tension: 90,
-      useNativeDriver: true,
-    }).start();
-  }, [isArabic, knobX]);
-
-  return (
-    <Pressable
-      onPress={() => onChange(isArabic ? 'en' : 'ar')}
-      hitSlop={8}
-      accessibilityRole="button"
-      accessibilityLabel={`Language: ${current.name}`}
-      accessibilityHint={`Switches to ${other.name}`}
-      style={styles.toggle}
-    >
-      <View style={styles.toggleTrack}>
-        <Animated.View
-          style={[styles.toggleKnob, { transform: [{ translateX: knobX }] }]}
-        >
-          <Text style={styles.toggleFlag}>{current.flag}</Text>
-        </Animated.View>
-      </View>
-      <Text style={styles.toggleLabel}>{current.name}</Text>
-    </Pressable>
-  );
-}
-
 function WelcomeScreen({ navigation }: RootStackScreenProps<'Welcome'>) {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const listRef = useRef<FlatList<Slide>>(null);
   const scrollX = useRef(new Animated.Value(0)).current;
   const [index, setIndex] = useState(0);
-  const [language, setLanguage] = useState<Language>('en');
   const isLast = index === SLIDES.length - 1;
+  const illustrationSize = Math.min(width * 0.8, height * 0.38, 340);
+
+  const atSlide = (i: number, outputRange: number[]) =>
+    scrollX.interpolate({
+      inputRange: [(i - 1) * width, i * width, (i + 1) * width],
+      outputRange,
+      extrapolate: 'clamp',
+    });
+
+  const handleScroll = useMemo(
+    () =>
+      Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+        useNativeDriver: true,
+        listener: (event: NativeSyntheticEvent<NativeScrollEvent>) =>
+          setIndex(Math.round(event.nativeEvent.contentOffset.x / width)),
+      }),
+    [scrollX, width],
+  );
 
   const finish = () => navigation.replace('Login');
-
-  const handleNext = () => {
-    if (isLast) {
-      finish();
-      return;
-    }
-    listRef.current?.scrollToIndex({ index: index + 1 });
-    setIndex(index + 1);
-  };
+  const goTo = (target: number) =>
+    listRef.current?.scrollToIndex({ index: target });
 
   return (
     <View
@@ -137,8 +90,18 @@ function WelcomeScreen({ navigation }: RootStackScreenProps<'Welcome'>) {
       ]}
     >
       <StatusBar barStyle="dark-content" animated />
+      {SLIDES.map((slide, i) => (
+        <Animated.View
+          key={slide.key}
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: slide.tint, opacity: atSlide(i, [0, 1, 0]) },
+          ]}
+        />
+      ))}
+
       <View style={styles.header}>
-        <LanguageToggle value={language} onChange={setLanguage} />
         {!isLast && (
           <Pressable onPress={finish} hitSlop={12} accessibilityRole="button">
             <Text style={styles.skip}>Skip</Text>
@@ -152,64 +115,71 @@ function WelcomeScreen({ navigation }: RootStackScreenProps<'Welcome'>) {
         keyExtractor={item => item.key}
         horizontal
         pagingEnabled
-        scrollEnabled={false}
         bounces={false}
+        overScrollMode="never"
         showsHorizontalScrollIndicator={false}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-          { useNativeDriver: false },
-        )}
+        onScroll={handleScroll}
         scrollEventThrottle={16}
         getItemLayout={(_, i) => ({
           length: width,
           offset: width * i,
           index: i,
         })}
-        renderItem={({ item }) => (
+        renderItem={({ item, index: i }) => (
           <View style={[styles.slide, { width }]}>
-            <Image
+            <Animated.Image
               source={item.image}
               fadeDuration={0}
-              style={styles.illustration}
+              style={{
+                width: illustrationSize,
+                height: illustrationSize,
+                opacity: atSlide(i, [0, 1, 0]),
+                transform: [
+                  { translateX: atSlide(i, [width * 0.3, 0, -width * 0.3]) },
+                  { scale: atSlide(i, [0.8, 1, 0.8]) },
+                ],
+              }}
             />
-            <Text style={styles.title}>{item.title}</Text>
-            <Text style={styles.description}>{item.description}</Text>
+            <Animated.View
+              style={{
+                opacity: atSlide(i, [0, 1, 0]),
+                transform: [
+                  { translateX: atSlide(i, [width * 0.2, 0, -width * 0.2]) },
+                ],
+              }}
+            >
+              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.description}>{item.description}</Text>
+            </Animated.View>
           </View>
         )}
       />
 
       <View style={styles.dots}>
-        {SLIDES.map((slide, i) => {
-          const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
-          return (
+        {SLIDES.map((slide, i) => (
+          <Pressable
+            key={slide.key}
+            onPress={() => goTo(i)}
+            hitSlop={12}
+            accessibilityRole="button"
+            accessibilityLabel={slide.title}
+            accessibilityState={{ selected: i === index }}
+          >
             <Animated.View
-              key={slide.key}
               style={[
                 styles.dot,
                 {
-                  width: scrollX.interpolate({
-                    inputRange,
-                    outputRange: [8, 24, 8],
-                    extrapolate: 'clamp',
-                  }),
-                  backgroundColor: scrollX.interpolate({
-                    inputRange,
-                    outputRange: [
-                      COLORS.dotInactive,
-                      COLORS.primary,
-                      COLORS.dotInactive,
-                    ],
-                    extrapolate: 'clamp',
-                  }),
+                  opacity: atSlide(i, [0.25, 1, 0.25]),
+                  transform: [{ scale: atSlide(i, [1, 1.4, 1]) }],
                 },
               ]}
             />
-          );
-        })}
+          </Pressable>
+        ))}
       </View>
       <Button
         title={isLast ? 'Get started' : 'Next'}
-        onPress={handleNext}
+        onPress={() => (isLast ? finish() : goTo(index + 1))}
         style={styles.button}
       />
     </View>
@@ -219,68 +189,29 @@ function WelcomeScreen({ navigation }: RootStackScreenProps<'Welcome'>) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   header: {
     height: 56,
     paddingHorizontal: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  toggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  toggleTrack: {
-    width: TRACK_WIDTH,
-    height: KNOB_SIZE + TRACK_PADDING * 2,
-    padding: TRACK_PADDING,
-    borderRadius: (KNOB_SIZE + TRACK_PADDING * 2) / 2,
-    backgroundColor: COLORS.primary,
-  },
-  toggleKnob: {
-    width: KNOB_SIZE,
-    height: KNOB_SIZE,
-    borderRadius: KNOB_SIZE / 2,
-    backgroundColor: COLORS.surface,
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 3,
-  },
-  toggleFlag: {
-    fontSize: 16,
-  },
-  toggleLabel: {
-    fontFamily: fonts.semibold,
-    fontSize: 15,
-    color: COLORS.title,
   },
   skip: {
     fontFamily: fonts.semibold,
     fontSize: 16,
-    color: COLORS.primary,
+    color: colors.primary,
   },
   slide: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
-  illustration: {
-    width: 280,
-    height: 280,
-    marginBottom: 32,
-  },
   title: {
+    marginTop: 32,
     fontFamily: fonts.bold,
     fontSize: 26,
-    color: COLORS.title,
+    color: colors.title,
     textAlign: 'center',
   },
   description: {
@@ -288,18 +219,20 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 16,
     lineHeight: 24,
-    color: COLORS.body,
+    color: colors.body,
     textAlign: 'center',
   },
   dots: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 8,
+    gap: 14,
     marginBottom: 24,
   },
   dot: {
+    width: 8,
     height: 8,
     borderRadius: 4,
+    backgroundColor: colors.primary,
   },
   button: {
     marginHorizontal: 24,

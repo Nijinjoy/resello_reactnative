@@ -54,7 +54,6 @@ const renderIcon =
   ({ focused, color }: { focused: boolean; color: string }) =>
     <TabIcon Icon={Icon} focused={focused} color={color} />;
 
-// Disable the default press feedback (iOS opacity fade, Android ripple)
 const renderTabButton = ({
   children,
   style,
@@ -131,7 +130,7 @@ function MainTabs() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
   },
   bar: {
     paddingTop: 8,

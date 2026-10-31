@@ -2,20 +2,16 @@ import { StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { colors } from '../theme/colors';
 import { fonts } from '../theme/typography';
 
-// Proportions are taken from the 56pt tile and scaled to `size`.
 const BASE_SIZE = 56;
 const BASE_RING = 34;
 
 type Props = {
   size?: number;
-  // `bare` drops the white backing so the ring itself fills `size`.
   shape?: 'tile' | 'circle' | 'bare';
-  // Ring and letter colour; the gold accent is kept.
   color?: string;
   style?: StyleProp<ViewStyle>;
 };
 
-// Drawn stand-in for the Resello "r" mark; swap for the PNG asset once available.
 function LogoMark({
   size = BASE_SIZE,
   shape = 'tile',
@@ -26,7 +22,6 @@ function LogoMark({
   const k = size / (bare ? BASE_RING : BASE_SIZE);
   const ring = BASE_RING * k;
   const dot = 6 * k;
-  // Keeps the dot at the same spot on the ring with or without the backing.
   const dotInset = (bare ? -1 : 10) * k;
 
   return (
